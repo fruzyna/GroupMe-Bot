@@ -1,7 +1,4 @@
-import requests
-import time
-import re
-import sys
+import requests, time, re, sys, sympy, threading
 from os.path import isfile, expanduser
 
 # Gets config file from command
@@ -33,10 +30,8 @@ else:
     f.close()
     sys.exit('No config file found at ' + cFile)
 
-# Global variables
-firstRun = True
-firstMsg = True
-request_params = {'token': token}
+msgLimit = 5
+request_params = {'token': token, 'limit': msgLimit}
 
 # Sends a new message
 def sendMessage(text):
@@ -60,35 +55,38 @@ def processMessage(message):
     if re.search('suck.*dick', text):
         sendMessage('I found one for you right here --> 8===D')
 
-    # Math calculations, disabled letters for security, not perfect but better
-    # TODO safer method of calculation
+    # Math calculations
     search = re.search('^calc\(([^a-zA-Z]+?)\)$', text)
     if search:
-        sendMessage('The answer is ' + str(eval(search.group(1))))
-
-    # TODO send messages to external file for plugins
+        sendMessage('The answer is ' + str(sympy.sympify(search.group(1))))
 
 # Fetches new messages every 3 seconds
-while True:
-    response = requests.get('https://api.groupme.com/v3/groups/' + group + '/messages', params=request_params)
+def fetchLoop():
+    firstRun = True
+    firstMsg = True
 
-    if (response.status_code == 200):
-        response_messages = response.json()['response']['messages']
+    while True:
+        response = requests.get('https://api.groupme.com/v3/groups/' + group + '/messages', params=request_params)
 
-        # Loop through all new messages (since last ping)
-        for message in response_messages:
-            # Get the newest id for fetching the next run
-            if firstMsg or request_params['since_id'] < message['id']:
-                request_params['since_id'] = message['id']
+        if (response.status_code == 200):
+            response_messages = response.json()['response']['messages']
 
-            # Respond to new messages (ignore those arriving on startup)
-            if not firstRun and message['user_id'] != botId:
-                print('[' + message['name'] + '] ' + message['text'])
-                processMessage(message)
+            # Loop through all new messages (since last ping)
+            for message in response_messages:
+                # Get the newest id for fetching the next run
+                if firstMsg or request_params['since_id'] < message['id']:
+                    request_params['since_id'] = message['id']
 
-            firstMsg = False
+                # Respond to new messages (ignore those arriving on startup)
+                if not firstRun and message['text'] != None:
+                    print('[' + message['name'] + '] ' + message['text'])
+                    threading.Thread(target=processMessage, args=[message]).start()
 
-        if firstRun:
-            firstRun = False      
+                firstMsg = False
 
-    time.sleep(3)
+            if firstRun:
+                firstRun = False      
+
+        time.sleep(3)
+
+threading.Thread(target=fetchLoop).start()
