@@ -1,4 +1,4 @@
-import requests, time, re, sys, sympy, threading
+import requests, time, sys, threading, re, sympy
 from os.path import isfile, expanduser
 
 # Gets config file from command
@@ -8,6 +8,8 @@ if len(sys.argv) == 2:
 elif len(sys.argv) > 2:
     sys.exit('Unknown command sequence')
 cFile = expanduser(cFile)
+
+pyFile = 'default.py'
 
 # Checks for and loads config file
 if isfile(cFile):
@@ -21,14 +23,22 @@ if isfile(cFile):
             group = parts[1]
         elif parts[0] == 'botId' and parts[1] != '[BOT ID]':
             botId = parts[1]
+        elif parts[0] == 'exFun' and parts[1] != '[External Python Function]':
+            pyFile = parts[1]
 else:
     # Create new template file
     f = open(cFile, 'w+')
-    f.write('token=[API KEY]\n')
-    f.write('group=[GROUP ID]\n')
-    f.write('botId=[BOT ID]')
+    f.write('token=[API KEY]\ngroup=[GROUP ID]\nbotId=[BOT ID]\nexFun=bot.py')
     f.close()
     sys.exit('No config file found at ' + cFile)
+
+# Load in the response configuration
+pyFile = expanduser(pyFile)
+if isfile(pyFile):
+    pyFileTxt = open(pyFile, 'r').read()
+    exec(pyFileTxt)
+else:
+    sys.exit('No response file found at ' + pyFile)
 
 msgLimit = 5
 request_params = {'token': token, 'limit': msgLimit}
@@ -38,34 +48,18 @@ def sendMessage(text):
     post_params = { 'bot_id' : botId, 'text': text }
     requests.post('https://api.groupme.com/v3/bots/post', params=post_params)
 
-# Parses a given message and crafts a response
-def processMessage(message):
-    text = message['text'].lower()
-
-    # Turn off the bot
-    if 'Screw off you mother loving bot!' == message['text']:
-        sendMessage('Shutting down...')
-        sys.exit('Shut down by command')
-        
-    # Basic response
-    if 'bot!' in text:
-        sendMessage('Hello there!')
-
-    # Self explanatory
-    if re.search('suck.*dick', text):
-        sendMessage('I found one for you right here --> 8===D')
-
-    # Math calculations
-    search = re.search('^calc\(([^a-zA-Z]+?)\)$', text)
-    if search:
-        sendMessage('The answer is ' + str(sympy.sympify(search.group(1))))
+# Shuts the bot down with a message
+def shutdown(msg, warn):
+    run.clear()
+    if warn:
+        print('Press enter to complete shutdown')
 
 # Fetches new messages every 3 seconds
-def fetchLoop():
+def fetchLoop(running):
     firstRun = True
     firstMsg = True
 
-    while True:
+    while running.is_set():
         response = requests.get('https://api.groupme.com/v3/groups/' + group + '/messages', params=request_params)
 
         if (response.status_code == 200):
@@ -85,8 +79,23 @@ def fetchLoop():
                 firstMsg = False
 
             if firstRun:
-                firstRun = False      
+                firstRun = False  
 
         time.sleep(3)
 
-threading.Thread(target=fetchLoop).start()
+# Locally send commands
+def inputLoop(running):
+    while running.is_set():
+        cmdParts = input().split()
+        if len(cmdParts) > 0:
+            cmd = cmdParts[0]
+            if cmd == 'send':
+                sendMessage(' '.join(cmdParts[1:]))
+            elif cmd == 'shutdown':
+                shutdown('Shutting down', False)
+
+# Startup threads
+run = threading.Event()
+run.set()
+threading.Thread(target=fetchLoop, args=[run]).start()
+threading.Thread(target=inputLoop, args=[run]).start()
