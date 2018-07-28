@@ -1,5 +1,4 @@
-import re
-import sympy, feedparser
+import re, sympy, feedparser
 
 class BotResponses:
     def __init__(self, bot):
@@ -32,7 +31,7 @@ class BotResponses:
             self.bot.sendMessage(mem['nickname'] + ' is now ' + un + 'muted')
         
     def update(self):
-        entries = feedparser.parse('https://mail929.github.io/BMES-Meeting-Minutes/feed.xml').entries
+        entries = feedparser.parse('https://github.com/mail929/GroupMe-Bot/commits/master.atom').entries
         if self.old >= 0:
             for i in range(len(entries) - self.old):
                 new = entries[i]
