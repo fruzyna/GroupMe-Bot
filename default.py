@@ -1,9 +1,10 @@
 import re
-import sympy
+import sympy, feedparser
 
 class BotResponses:
     def __init__(self, bot):
         self.bot = bot
+        self.old = -1
 
     # Parses a given message and crafts a response
     def processMessage(self, message):
@@ -29,3 +30,11 @@ class BotResponses:
             if mem['muted'] == False:
                 un = 'un'
             self.bot.sendMessage(mem['nickname'] + ' is now ' + un + 'muted')
+        
+    def update(self):
+        entries = feedparser.parse('https://mail929.github.io/BMES-Meeting-Minutes/feed.xml').entries
+        if self.old >= 0:
+            for i in range(len(entries) - self.old):
+                new = entries[i]
+                self.bot.sendMessage(new['title'] + ' - ' + new['link'])
+        self.old = len(entries)

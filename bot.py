@@ -122,6 +122,13 @@ class Bot:
             
             time.sleep(60)
 
+    # Listen for updates every minute
+    def updateLoop(self, running):
+        print('Listening for updates...')
+        while running.is_set():
+            self.responses.update()
+            time.sleep(60)
+
     def __init__(self, token, group, botId, msgLimit, responses):
         print('Starting Bot...')
 
@@ -144,6 +151,7 @@ class Bot:
         threading.Thread(target=self.fetchLoop, args=[self.run]).start()
         threading.Thread(target=self.inputLoop, args=[self.run]).start()
         threading.Thread(target=self.memberLoop, args=[self.run]).start()
+        threading.Thread(target=self.updateLoop, args=[self.run]).start()
 
 class LocalCmd():
     def __init__(self, name, options, description, bot, response):
