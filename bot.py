@@ -45,14 +45,21 @@ class Bot:
     # Sends a new message
     def sendMessage(self, text):
         post_params = { 'bot_id' : self.botId, 'text': text }
-        requests.post('https://api.groupme.com/v3/bots/post', params=post_params)
+        try:
+            requests.post('https://api.groupme.com/v3/bots/post', params=post_params)
+        except:
+            print('Exception sending message:', sys.exc_info()[0])
 
     # Returns group info
     def getGroupItem(self, key):
         group_params = {'token': self.token}
-        response = requests.get('https://api.groupme.com/v3/groups/' + self.group, params=group_params)
-        if (response.status_code == 200):
-            return response.json()['response'][key]
+        try:
+            response = requests.get('https://api.groupme.com/v3/groups/' + self.group, params=group_params)
+            if (response.status_code == 200):
+                return response.json()['response'][key]
+        except:
+            print('Exception getting group:', sys.exc_info()[0])
+        return ''
 
     # Shuts the bot down with a message
     def shutdown(self, msg, warn):
@@ -69,24 +76,27 @@ class Bot:
 
         print('Listening for new messages...')
         while running.is_set():
-            response = requests.get('https://api.groupme.com/v3/groups/' + self.group + '/messages', params=request_params)
+            try:
+                response = requests.get('https://api.groupme.com/v3/groups/' + self.group + '/messages', params=request_params)
 
-            if (response.status_code == 200):
-                response_messages = response.json()['response']['messages']
+                if (response.status_code == 200):
+                    response_messages = response.json()['response']['messages']
 
-                # Loop through all new messages (since last ping)
-                for message in response_messages:
-                    # Get the newest id for fetching the next run
-                    if firstMsg or request_params['since_id'] < message['id']:
-                        request_params['since_id'] = message['id']
-                        firstMsg = False
+                    # Loop through all new messages (since last ping)
+                    for message in response_messages:
+                        # Get the newest id for fetching the next run
+                        if firstMsg or request_params['since_id'] < message['id']:
+                            request_params['since_id'] = message['id']
+                            firstMsg = False
 
-                    # Respond to new messages (ignore those arriving on startup)
-                    if not firstRun and message['text'] != None:
-                        print('[' + message['name'] + '] ' + message['text'])
-                        threading.Thread(target=self.responses.processMessage, args=[message]).start()
+                        # Respond to new messages (ignore those arriving on startup)
+                        if not firstRun and message['text'] != None:
+                            print('[' + message['name'] + '] ' + message['text'])
+                            threading.Thread(target=self.responses.processMessage, args=[message]).start()
 
-                firstRun = False  
+                    firstRun = False
+            except:
+                print('Exception getting messages:', sys.exc_info()[0])
 
             time.sleep(3)
 
